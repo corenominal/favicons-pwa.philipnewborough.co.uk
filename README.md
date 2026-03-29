@@ -1,5 +1,7 @@
 # Favicon & PWA Icon Generator
 
+![Favicon & PWA Icon Generator](public/img/og-favicon-pwa-icon-generator-1200x600.png)
+
 A free, browser-based tool that generates every icon size your website or Progressive Web App needs — no server uploads, no account required. All processing happens entirely in the browser using the Canvas API.
 
 Live at: [favicons-pwa.philipnewbrough.co.uk](https://favicons-pwa.philipnewbrough.co.uk)
