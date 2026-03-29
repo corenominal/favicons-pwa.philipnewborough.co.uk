@@ -895,7 +895,8 @@ select.form-control {
 /* Canvas wrapper for safe-zone overlay */
 .canvas-wrap {
     position: relative;
-    display: inline-block;
+    display: block;
+    width: fit-content;
     line-height: 0;
 }
 
