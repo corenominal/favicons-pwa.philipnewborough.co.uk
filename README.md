@@ -10,7 +10,8 @@ Live at: [favicons-pwa.philipnewborough.co.uk](https://favicons-pwa.philipnewbor
 
 - **Upload any image** and instantly generate a full set of resized icons
 - **Icon sizes generated:** 512×512, 256×256, 192×192, 180×180, 152×152, 144×144, 128×128, 96×96, 64×64, 48×48, 32×32, 16×16
-- **Shape editor** — apply circle, squircle (iOS-style superellipse), rounded rect, or teardrop masks to your icon before export
+- **Shape editor** — apply circle, squircle (iOS-style superellipse), rounded rect, or teardrop masks globally across all icons before export
+- **Per-icon actions** — click any individual icon to: download it as `icon-{W}x{H}.png`; replace it with a different source image; or apply a shape clip to that one size only (independent of the global shape edit)
 - **Maskable icon safe zone overlay** — visualise the central 80% safe zone to ensure key artwork survives platform clipping
 - **Shape previews** — see how your icon looks masked as a circle, squircle, rounded square, and teardrop
 - **Manifest tab** — configure `name`, `short_name`, `theme_color`, and `background_color` for your `manifest.json`

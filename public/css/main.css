@@ -980,3 +980,52 @@ select.form-control {
     height: 160px;
 }
 
+/* Clickable icon canvases */
+.canvas-wrap canvas {
+    cursor: pointer;
+}
+
+/* ── Per-icon context menu ───────────────────────────────────────────────── */
+.icon-ctx-menu {
+    display: none;
+    position: absolute;
+    z-index: 300;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    min-width: 145px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+    padding: 0.3rem 0;
+}
+
+.icon-ctx-menu.open {
+    display: block;
+    animation: tab-in 0.15s ease;
+}
+
+.icon-ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0.45rem 1rem;
+    font-size: 0.9rem;
+    color: var(--fg);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    line-height: 1.4;
+}
+
+.icon-ctx-item:hover {
+    background-color: var(--surface-deep);
+}
+
+.icon-ctx-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.3rem 0;
+}
+

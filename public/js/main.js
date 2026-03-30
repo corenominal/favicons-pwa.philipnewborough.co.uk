@@ -62,6 +62,9 @@ let size = null;
 let canvas = null;
 let ctx = null;
 let originalCanvas512DataUrl = null;
+let currentShape = null;
+const iconSources = new Map(); // canvasId → raw (un-shaped) dataUrl for individually-uploaded icons
+const iconShapes  = new Map(); // canvasId → shape override for individual icons
 
 // Trigger upload
 btnUpload.addEventListener('click', function(){
@@ -85,9 +88,12 @@ function resetToUnicorn() {
             cx.drawImage(img, 0, 0, s, s);
         });
         originalCanvas512DataUrl = null;
+        currentShape = null;
         const rb = document.getElementById('btn-edit-restore');
         if (rb) rb.disabled = true;
         localStorage.removeItem('pwa_icon');
+        iconSources.clear();
+        iconShapes.clear();
         updateShapePreviews();
     };
     img.src = 'img/icon-512x512.png';
@@ -191,7 +197,22 @@ function updateShapePreviews() {
 };
 
 // ── Shape edit ───────────────────────────────────────────────────────────────
+function applyClipPath(ctx, shape, size) {
+    if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+        ctx.clip();
+    } else if (shape === 'squircle') {
+        clipSquircle(ctx, size);
+    } else if (shape === 'rounded') {
+        ctx.beginPath();
+        ctx.roundRect(0, 0, size, size, size * 0.22);
+        ctx.clip();
+    }
+}
+
 function applyShapeEdit(shape) {
+    currentShape = shape;
     // Always apply from the unedited original so switching shapes doesn't compound
     const srcDataUrl = originalCanvas512DataUrl || canvas512.toDataURL();
     if (!originalCanvas512DataUrl) {
@@ -204,17 +225,7 @@ function applyShapeEdit(shape) {
         offscreen.width = offscreen.height = sz;
         const offCtx = offscreen.getContext('2d');
         offCtx.save();
-        if (shape === 'circle') {
-            offCtx.beginPath();
-            offCtx.arc(sz / 2, sz / 2, sz / 2, 0, Math.PI * 2);
-            offCtx.clip();
-        } else if (shape === 'squircle') {
-            clipSquircle(offCtx, sz);
-        } else if (shape === 'rounded') {
-            offCtx.beginPath();
-            offCtx.roundRect(0, 0, sz, sz, sz * 0.22);
-            offCtx.clip();
-        }
+        applyClipPath(offCtx, shape, sz);
         offCtx.imageSmoothingEnabled = true;
         offCtx.imageSmoothingQuality = 'high';
         offCtx.drawImage(srcImg, 0, 0, sz, sz);
@@ -230,11 +241,56 @@ function applyShapeEdit(shape) {
             cx.imageSmoothingQuality = 'high';
             cx.drawImage(offscreen, 0, 0, s, s);
         });
+        reapplyIconCustomizations();
         updateShapePreviews();
         saveIconToStorage();
         document.getElementById('btn-edit-restore').disabled = false;
     };
     srcImg.src = srcDataUrl;
+}
+
+// Draws one icon canvas from its source (individual upload or canvas512) plus any active shape.
+function redrawIconCanvas(canvasId) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const s     = c.width;
+    const shape = iconShapes.get(canvasId) || currentShape || null;
+    const cx    = c.getContext('2d');
+
+    function paint(sourceImg) {
+        if (shape) {
+            const off    = document.createElement('canvas');
+            off.width    = s;
+            off.height   = s;
+            const offCtx = off.getContext('2d');
+            offCtx.save();
+            applyClipPath(offCtx, shape, s);
+            offCtx.imageSmoothingEnabled = true;
+            offCtx.imageSmoothingQuality = 'high';
+            offCtx.drawImage(sourceImg, 0, 0, s, s);
+            offCtx.restore();
+            cx.clearRect(0, 0, s, s);
+            cx.drawImage(off, 0, 0, s, s);
+        } else {
+            cx.clearRect(0, 0, s, s);
+            cx.imageSmoothingEnabled = true;
+            cx.imageSmoothingQuality = 'high';
+            cx.drawImage(sourceImg, 0, 0, s, s);
+        }
+    }
+
+    if (iconSources.has(canvasId)) {
+        const img = new Image();
+        img.onload = function () { paint(img); };
+        img.src = iconSources.get(canvasId);
+    } else {
+        paint(canvas512);
+    }
+}
+
+function reapplyIconCustomizations() {
+    const allIds = new Set([...iconSources.keys(), ...iconShapes.keys()]);
+    allIds.forEach(function (canvasId) { redrawIconCanvas(canvasId); });
 }
 
 function restoreOriginalIcon() {
@@ -253,7 +309,9 @@ function restoreOriginalIcon() {
             cx.drawImage(img, 0, 0, s, s);
         });
         originalCanvas512DataUrl = null;
+        currentShape = null;
         document.getElementById('btn-edit-restore').disabled = true;
+        reapplyIconCustomizations();
         updateShapePreviews();
         saveIconToStorage();
     };
@@ -311,6 +369,7 @@ function processImageFile(file) {
         URL.revokeObjectURL(objectUrl);
         // New image loaded — clear any prior shape edit
         originalCanvas512DataUrl = null;
+        currentShape = null;
         const rb = document.getElementById('btn-edit-restore');
         if (rb) rb.disabled = true;
         const srcW = img.naturalWidth;
@@ -335,6 +394,8 @@ function processImageFile(file) {
          [canvas48,  48],  [canvas32,  32],  [canvas16,  16]
         ].forEach(([c, s]) => drawCover(c.getContext('2d'), s));
 
+        iconSources.clear();
+        iconShapes.clear();
         document.getElementById('btn-reset').disabled = false;
         saveIconToStorage();
         updateShapePreviews();
@@ -790,3 +851,202 @@ The \`manifest.json\` file tells browsers how your web app should appear and beh
 - \`apple-touch-icon.png\` is listed in \`manifest.json\` under a separate \`"purpose": "any"\` entry so it is displayed as-is without masking or cropping.
 `;
 }
+
+// ── Per-icon context menu (click on canvas → Download / Upload / Edit) ──────
+(function () {
+    // Build the floating dropdown
+    const menu = document.createElement('div');
+    menu.id        = 'icon-ctx-menu';
+    menu.className = 'icon-ctx-menu';
+    menu.setAttribute('aria-hidden', 'true');
+    menu.innerHTML =
+        '<button class="icon-ctx-item" id="icon-ctx-download"><i class="bi bi-download"></i> Download</button>' +
+        '<div class="icon-ctx-divider"></div>' +
+        '<button class="icon-ctx-item" id="icon-ctx-upload"><i class="bi bi-upload"></i> Upload</button>' +
+        '<div class="icon-ctx-divider"></div>' +
+        '<button class="icon-ctx-item" data-icon-shape="circle"><i class="bi bi-circle"></i> Round</button>' +
+        '<button class="icon-ctx-item" data-icon-shape="squircle"><i class="bi bi-app"></i> Squircle</button>' +
+        '<button class="icon-ctx-item" data-icon-shape="rounded"><i class="bi bi-square"></i> Rounded</button>' +
+        '<div class="icon-ctx-divider"></div>' +
+        '<button class="icon-ctx-item" id="icon-ctx-restore"><i class="bi bi-arrow-counterclockwise"></i> Restore original</button>';
+    document.body.appendChild(menu);
+
+    // Dedicated hidden file input for per-icon uploads
+    const iconUploadInput  = document.createElement('input');
+    iconUploadInput.type   = 'file';
+    iconUploadInput.accept = 'image/*';
+    iconUploadInput.style.display = 'none';
+    document.body.appendChild(iconUploadInput);
+
+    let activeCanvas = null;
+    let activeSize   = null;
+
+    function closeMenu() {
+        menu.classList.remove('open');
+        menu.setAttribute('aria-hidden', 'true');
+    }
+
+    function updateRestoreBtn() {
+        const btn = document.getElementById('icon-ctx-restore');
+        if (!btn || !activeCanvas) return;
+        btn.disabled = !iconSources.has(activeCanvas.id) && !iconShapes.has(activeCanvas.id);
+    }
+
+    function openMenu(canvasEl, size, e) {
+        activeCanvas = canvasEl;
+        activeSize   = size;
+
+        // Position below the canvas, adjusted for scroll
+        const rect = canvasEl.getBoundingClientRect();
+        let left = rect.left + window.scrollX;
+        let top  = rect.bottom + window.scrollY + 6;
+        menu.style.left = left + 'px';
+        menu.style.top  = top  + 'px';
+
+        updateRestoreBtn();
+        menu.classList.add('open');
+        menu.setAttribute('aria-hidden', 'false');
+        e.stopPropagation();
+
+        // Clamp to viewport after layout
+        requestAnimationFrame(function () {
+            const mRect = menu.getBoundingClientRect();
+            if (mRect.right > window.innerWidth - 8) {
+                menu.style.left = (Math.max(8, window.innerWidth - mRect.width - 8) + window.scrollX) + 'px';
+            }
+        });
+    }
+
+    // Attach click to every icon canvas inside a .canvas-wrap
+    document.querySelectorAll('.canvas-wrap canvas').forEach(function (canvas) {
+        const size = parseInt(canvas.getAttribute('width'), 10);
+        canvas.addEventListener('click', function (e) {
+            if (menu.classList.contains('open') && activeCanvas === canvas) {
+                closeMenu();
+            } else {
+                openMenu(canvas, size, e);
+            }
+        });
+    });
+
+    // Download the active icon
+    document.getElementById('icon-ctx-download').addEventListener('click', function () {
+        if (!activeCanvas) return;
+        const filename = 'icon-' + activeSize + 'x' + activeSize + '.png';
+        const link = document.createElement('a');
+        link.href     = activeCanvas.toDataURL('image/png');
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        closeMenu();
+    });
+
+    // Upload: open file picker (keep activeCanvas/Size for the change handler)
+    document.getElementById('icon-ctx-upload').addEventListener('click', function () {
+        iconUploadInput.value = '';   // allow re-selecting the same file
+        iconUploadInput.click();
+        closeMenu();
+    });
+
+    // Draw the chosen file onto only the target canvas
+    iconUploadInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file || !file.type.match('image.*')) {
+            notify_send('Error!', 'Please upload an image file.', 'danger');
+            return;
+        }
+        if (!activeCanvas || !activeSize) return;
+        const s   = activeSize;
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+        img.onload = function () {
+            URL.revokeObjectURL(objectUrl);
+            const srcW  = img.naturalWidth;
+            const srcH  = img.naturalHeight;
+            const scale = s / Math.min(srcW, srcH);
+            const sw    = srcW * scale;
+            const sh    = srcH * scale;
+            const dx    = (s - sw) / 2;
+            const dy    = (s - sh) / 2;
+            // Capture raw cover-scaled source (no shape)
+            const tmp       = document.createElement('canvas');
+            tmp.width       = s;
+            tmp.height      = s;
+            const tmpCtx    = tmp.getContext('2d');
+            tmpCtx.imageSmoothingEnabled = true;
+            tmpCtx.imageSmoothingQuality = 'high';
+            tmpCtx.drawImage(img, dx, dy, sw, sh);
+            iconSources.set(activeCanvas.id, tmp.toDataURL());
+            iconShapes.delete(activeCanvas.id); // new source starts fresh
+            redrawIconCanvas(activeCanvas.id);
+            document.getElementById('btn-reset').disabled = false;
+        };
+    });
+
+    // Per-icon shape edit
+    menu.querySelectorAll('[data-icon-shape]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (!activeCanvas) return;
+            const shape    = this.dataset.iconShape;
+            const canvasId = activeCanvas.id;
+            // Capture source from canvas512 if not individually uploaded
+            if (!iconSources.has(canvasId)) {
+                const s   = activeSize;
+                const tmp = document.createElement('canvas');
+                tmp.width = tmp.height = s;
+                const tCtx = tmp.getContext('2d');
+                tCtx.imageSmoothingEnabled = true;
+                tCtx.imageSmoothingQuality = 'high';
+                tCtx.drawImage(canvas512, 0, 0, s, s);
+                iconSources.set(canvasId, tmp.toDataURL());
+            }
+            iconShapes.set(canvasId, shape);
+            redrawIconCanvas(canvasId);
+            document.getElementById('btn-reset').disabled = false;
+            updateRestoreBtn();
+            closeMenu();
+        });
+    });
+
+    // Restore this icon to the global base + global shape
+    document.getElementById('icon-ctx-restore').addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!activeCanvas) return;
+        const canvasId = activeCanvas.id;
+        iconSources.delete(canvasId);
+        iconShapes.delete(canvasId);
+        // Redraw from canvas512 with global shape (if any)
+        const s  = activeSize;
+        const cx = activeCanvas.getContext('2d');
+        if (currentShape) {
+            const off    = document.createElement('canvas');
+            off.width    = s;
+            off.height   = s;
+            const offCtx = off.getContext('2d');
+            offCtx.save();
+            applyClipPath(offCtx, currentShape, s);
+            offCtx.imageSmoothingEnabled = true;
+            offCtx.imageSmoothingQuality = 'high';
+            offCtx.drawImage(canvas512, 0, 0, s, s);
+            offCtx.restore();
+            cx.clearRect(0, 0, s, s);
+            cx.drawImage(off, 0, 0, s, s);
+        } else {
+            cx.clearRect(0, 0, s, s);
+            cx.imageSmoothingEnabled = true;
+            cx.imageSmoothingQuality = 'high';
+            cx.drawImage(canvas512, 0, 0, s, s);
+        }
+        updateRestoreBtn();
+        closeMenu();
+    });
+
+    // Dismiss on outside click or Escape
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeMenu();
+    });
+})();
