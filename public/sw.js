@@ -2,7 +2,7 @@
 // To push an update to users: bump this version string (e.g. v2, v3 …),
 // then deploy.  The browser will install the new SW, delete the old cache,
 // and serve fresh assets on the next page load.
-const CACHE_NAME = 'favicons-pwa-v1.31';
+const CACHE_NAME = 'favicons-pwa-v1.32';
 
 // ─── Assets to pre-cache on install ───────────────────────────────────────────
 const ASSETS = [
@@ -10,7 +10,7 @@ const ASSETS = [
     '/index.html',
     '/manifest.json',
     '/css/main.css?v=9c9bab95',
-    '/js/main.js?v=139ce6e7',
+    '/js/main.js?v=ac89b835',
     '/js/metrics.js?v=9d93458a',
     '/vendor/bootstrap-icons/font/bootstrap-icons.min.css',
     '/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2',
