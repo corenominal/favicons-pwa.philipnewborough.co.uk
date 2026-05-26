@@ -534,7 +534,8 @@ function saveFormToStorage() {
         name:        document.getElementById('manifest-name').value,
         shortName:   document.getElementById('manifest-short-name').value,
         description: document.getElementById('manifest-description').value,
-        themeColor:  document.getElementById('manifest-theme-color').value,
+        themeColorLight: document.getElementById('manifest-theme-color-light').value,
+        themeColorDark:  document.getElementById('manifest-theme-color-dark').value,
         bgColor:     document.getElementById('manifest-bg-color').value,
         display:     document.getElementById('manifest-display').value,
         startUrl:    document.getElementById('manifest-start-url').value,
@@ -549,9 +550,13 @@ function loadFormFromStorage() {
     if (data.name        !== undefined) document.getElementById('manifest-name').value        = data.name;
     if (data.shortName   !== undefined) document.getElementById('manifest-short-name').value  = data.shortName;
     if (data.description !== undefined) document.getElementById('manifest-description').value = data.description;
-    if (data.themeColor  !== undefined) {
-        document.getElementById('manifest-theme-color').value        = data.themeColor;
-        document.getElementById('manifest-theme-color-picker').value = data.themeColor;
+    if (data.themeColorLight !== undefined) {
+        document.getElementById('manifest-theme-color-light').value        = data.themeColorLight;
+        document.getElementById('manifest-theme-color-light-picker').value = data.themeColorLight;
+    }
+    if (data.themeColorDark !== undefined) {
+        document.getElementById('manifest-theme-color-dark').value        = data.themeColorDark;
+        document.getElementById('manifest-theme-color-dark-picker').value = data.themeColorDark;
     }
     if (data.bgColor !== undefined) {
         document.getElementById('manifest-bg-color').value        = data.bgColor;
@@ -602,8 +607,9 @@ function generateManifest() {
     const shortName   = document.getElementById('manifest-short-name').value;
     const description = document.getElementById('manifest-description').value;
     const startUrl    = document.getElementById('manifest-start-url').value || '/';
-    const themeColor  = document.getElementById('manifest-theme-color').value;
-    const bgColor     = document.getElementById('manifest-bg-color').value;
+    const themeColorLight = document.getElementById('manifest-theme-color-light').value;
+    const themeColorDark  = document.getElementById('manifest-theme-color-dark').value;
+    const bgColor         = document.getElementById('manifest-bg-color').value;
     const display     = document.getElementById('manifest-display').value;
     const iconSizes   = ['512x512', '256x256', '192x192', '152x152', '144x144', '128x128', '96x96', '64x64', '48x48', '32x32', '16x16'];
     const icons = iconSizes.map(sizes => ({
@@ -623,7 +629,10 @@ function generateManifest() {
         short_name: shortName,
         start_url: startUrl,
         description,
-        theme_color: themeColor,
+        theme_color: [
+            { media: '(prefers-color-scheme: light)', color: themeColorLight },
+            { media: '(prefers-color-scheme: dark)',  color: themeColorDark  },
+        ],
         background_color: bgColor,
         display,
         icons,
@@ -652,7 +661,8 @@ function syncColor(pickerId, textId) {
     });
 }
 
-syncColor('manifest-theme-color-picker', 'manifest-theme-color');
+syncColor('manifest-theme-color-light-picker', 'manifest-theme-color-light');
+syncColor('manifest-theme-color-dark-picker',  'manifest-theme-color-dark');
 syncColor('manifest-bg-color-picker',    'manifest-bg-color');
 
 ['manifest-name', 'manifest-short-name', 'manifest-description', 'manifest-display', 'manifest-start-url'].forEach(id => {
@@ -776,7 +786,8 @@ document.getElementById('btn-export-zip').addEventListener('click', async () => 
 
 // HTML head-tags generator
 function generateHtmlHeadTags() {
-    const themeColor = document.getElementById('manifest-theme-color').value;
+    const themeColorLight = document.getElementById('manifest-theme-color-light').value;
+    const themeColorDark  = document.getElementById('manifest-theme-color-dark').value;
     return [
         '<!-- Favicon -->',
         '<link rel="icon" href="favicon.ico" sizes="any">',
@@ -790,7 +801,8 @@ function generateHtmlHeadTags() {
         '<link rel="manifest" href="manifest.json">',
         '',
         '<!-- Theme Colour -->',
-        `<meta name="theme-color" content="${themeColor}">`,
+        `<meta name="theme-color" content="${themeColorLight}" media="(prefers-color-scheme: light)">`,
+        `<meta name="theme-color" content="${themeColorDark}" media="(prefers-color-scheme: dark)">`,
     ].join('\n');
 }
 
@@ -800,8 +812,10 @@ function updateHtmlPreview() {
 }
 
 // Keep HTML preview in sync with theme-colour changes
-document.getElementById('manifest-theme-color').addEventListener('input', updateHtmlPreview);
-document.getElementById('manifest-theme-color-picker').addEventListener('input', updateHtmlPreview);
+document.getElementById('manifest-theme-color-light').addEventListener('input', updateHtmlPreview);
+document.getElementById('manifest-theme-color-light-picker').addEventListener('input', updateHtmlPreview);
+document.getElementById('manifest-theme-color-dark').addEventListener('input', updateHtmlPreview);
+document.getElementById('manifest-theme-color-dark-picker').addEventListener('input', updateHtmlPreview);
 
 // Initial render
 updateHtmlPreview();
