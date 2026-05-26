@@ -3,7 +3,16 @@
   "short_name": "PWAIconGen",
   "start_url": "/",
   "description": "Favicon & PWA Icon Generator is a free, browser-based tool that creates every icon size your website or Progressive Web App needs — no server uploads, no account required.",
-  "theme_color": "#272a36",
+  "theme_color": [
+    {
+      "media": "(prefers-color-scheme: light)",
+      "color": "#ffffff"
+    },
+    {
+      "media": "(prefers-color-scheme: dark)",
+      "color": "#272a36"
+    }
+  ],
   "background_color": "#272a36",
   "display": "standalone",
   "icons": [
