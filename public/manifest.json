@@ -6,7 +6,7 @@
   "theme_color": [
     {
       "media": "(prefers-color-scheme: light)",
-      "color": "#ffffff"
+      "color": "#FAFAFA"
     },
     {
       "media": "(prefers-color-scheme: dark)",
